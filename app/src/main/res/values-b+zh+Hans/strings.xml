@@ -1,0 +1,27 @@
+<resources>
+<string name="app_name">Simeji Clean</string>
+<string name="description">隐藏在 Google Play 搜索时显示的 Simeji 广告面板。需要 Xposed API 102。</string>
+<string name="enabled">隐藏广告面板</string>
+<string name="scope">仅在 Google Play 中输入时生效。按键、皮肤和转换候选保持原样。</string>
+<string name="pending">尚未确认挂钩</string>
+<string name="pending_note">请在 Vector 中启用此模块，仅选择 Simeji，然后重新加载 Simeji。</string>
+<string name="ready">已就绪</string>
+<string name="blocked">已隐藏广告面板</string>
+<string name="unsupported">此 Simeji 版本的结构不兼容</string>
+<string name="error">发生错误，挂钩已停止</string>
+<string name="guarded">崩溃保护已启用</string>
+<string name="off">已禁用</string>
+<string name="reload">重新加载 Simeji</string>
+<string name="root_request">正在检查 root 权限…</string>
+<string name="root_ok">可通过 root 重新加载。隐藏广告本身不需要 root。</string>
+<string name="root_no">无法使用 root。修改 Vector 作用域后，请手动重新加载 Simeji。</string>
+<string name="reload_confirm">键盘将暂时关闭。只重新加载 Simeji 吗？</string>
+<string name="cancel">取消</string>
+<string name="done">已重新加载 Simeji</string>
+<string name="failed">无法重新加载 Simeji</string>
+<string name="licenses">开源许可证</string>
+<string name="language">应用语言</string>
+<string name="reset">重置崩溃保护</string>
+<string name="reset_done">下次重新加载 Simeji 时将重置保护</string>
+<string name="privacy">不申请网络权限，不记录输入内容或转换候选。</string>
+</resources>

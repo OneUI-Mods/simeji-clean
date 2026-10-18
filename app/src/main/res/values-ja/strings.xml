@@ -1,0 +1,27 @@
+<resources>
+<string name="app_name">Simeji Clean</string>
+<string name="description">Playストア検索時のSimejiの広告パネルを非表示にします。Xposed API 102が必要です。</string>
+<string name="enabled">広告パネルを非表示</string>
+<string name="scope">Playストアでの入力中だけ適用します。キー・スキン・変換候補は標準のままです。</string>
+<string name="pending">フック未確認</string>
+<string name="pending_note">Vectorでこのモジュールを有効にし、Simejiだけを選んで読み込み直してください。</string>
+<string name="ready">準備完了</string>
+<string name="blocked">広告パネルを非表示にしました</string>
+<string name="unsupported">Simejiの構造が非対応です</string>
+<string name="error">エラーのためフックを停止しました</string>
+<string name="guarded">クラッシュ保護が作動しています</string>
+<string name="off">無効</string>
+<string name="reload">Simejiを読み込み直す</string>
+<string name="root_request">root権限を確認しています…</string>
+<string name="root_ok">読み込み直しにrootを利用できます。広告の非表示自体にはrootは不要です。</string>
+<string name="root_no">rootを利用できません。Vectorの適用先変更後はSimejiを手動で読み込み直してください。</string>
+<string name="reload_confirm">キーボードが一時的に閉じます。Simejiだけを読み込み直しますか？</string>
+<string name="cancel">キャンセル</string>
+<string name="done">Simejiを読み込み直しました</string>
+<string name="failed">Simejiの読み込み直しに失敗しました</string>
+<string name="licenses">オープンソースライセンス</string>
+<string name="language">アプリの言語</string>
+<string name="reset">クラッシュ保護を解除</string>
+<string name="reset_done">次のSimeji読み込み直しで保護を解除します</string>
+<string name="privacy">通信権限は要求しません。入力内容・変換候補を記録しません。</string>
+</resources>

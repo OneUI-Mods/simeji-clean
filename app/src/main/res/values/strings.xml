@@ -1,0 +1,27 @@
+<resources>
+<string name="app_name">Simeji Clean</string>
+<string name="description">Hide Simeji’s advertising popup while searching Google Play. Requires Xposed API 102.</string>
+<string name="enabled">Hide the advertising panel</string>
+<string name="scope">Only while typing in Google Play. Keyboard keys, skins and conversion candidates keep their native behavior.</string>
+<string name="pending">Hook not confirmed</string>
+<string name="pending_note">Enable this module in Vector, select only Simeji, then reload Simeji.</string>
+<string name="ready">Ready</string>
+<string name="blocked">Advertising popup blocked</string>
+<string name="unsupported">This Simeji version is not compatible</string>
+<string name="error">Hook stopped after an error</string>
+<string name="guarded">Crash protection is active</string>
+<string name="off">Disabled</string>
+<string name="reload">Reload Simeji</string>
+<string name="root_request">Checking root permission…</string>
+<string name="root_ok">Root available for reloading. Ad blocking itself does not need root.</string>
+<string name="root_no">Root unavailable. Reload Simeji manually after changing Vector scope.</string>
+<string name="reload_confirm">The keyboard will close briefly. Reload only Simeji?</string>
+<string name="cancel">Cancel</string>
+<string name="done">Simeji was reloaded</string>
+<string name="failed">Could not reload Simeji</string>
+<string name="licenses">Open-source licenses</string>
+<string name="language">App language</string>
+<string name="reset">Reset crash protection</string>
+<string name="reset_done">Protection will reset when Simeji is next reloaded</string>
+<string name="privacy">No network permission. Typed text and suggestions are never recorded.</string>
+</resources>

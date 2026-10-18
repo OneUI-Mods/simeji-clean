@@ -1,0 +1,27 @@
+<resources>
+<string name="app_name">Simeji Clean</string>
+<string name="description">Google Play 검색 시 표시되는 Simeji 광고 패널을 숨깁니다. Xposed API 102가 필요합니다.</string>
+<string name="enabled">광고 패널 숨기기</string>
+<string name="scope">Google Play에서 입력할 때만 적용됩니다. 키, 스킨, 변환 후보는 원래 동작을 유지합니다.</string>
+<string name="pending">후크 미확인</string>
+<string name="pending_note">Vector에서 이 모듈을 켜고 Simeji만 선택한 다음 Simeji를 다시 로드하세요.</string>
+<string name="ready">준비 완료</string>
+<string name="blocked">광고 패널을 숨겼습니다</string>
+<string name="unsupported">이 Simeji 버전의 구조는 호환되지 않습니다</string>
+<string name="error">오류로 후크를 중지했습니다</string>
+<string name="guarded">충돌 보호가 작동 중입니다</string>
+<string name="off">사용 안 함</string>
+<string name="reload">Simeji 다시 로드</string>
+<string name="root_request">root 권한 확인 중…</string>
+<string name="root_ok">다시 로드할 때 root를 사용할 수 있습니다. 광고 숨기기에는 root가 필요하지 않습니다.</string>
+<string name="root_no">root를 사용할 수 없습니다. Vector 범위를 변경한 뒤 Simeji를 수동으로 다시 로드하세요.</string>
+<string name="reload_confirm">키보드가 잠시 닫힙니다. Simeji만 다시 로드할까요?</string>
+<string name="cancel">취소</string>
+<string name="done">Simeji를 다시 로드했습니다</string>
+<string name="failed">Simeji를 다시 로드할 수 없습니다</string>
+<string name="licenses">오픈 소스 라이선스</string>
+<string name="language">앱 언어</string>
+<string name="reset">충돌 보호 해제</string>
+<string name="reset_done">다음 Simeji 로드 시 보호가 해제됩니다</string>
+<string name="privacy">네트워크 권한을 요청하지 않으며 입력 내용이나 변환 후보를 기록하지 않습니다.</string>
+</resources>
