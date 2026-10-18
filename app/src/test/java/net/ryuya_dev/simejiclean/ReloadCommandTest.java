@@ -86,8 +86,8 @@ public class ReloadCommandTest {
   }
 
   @Test
-  public void unknownSimejiServiceIsNotSelected() throws Exception {
+  public void updatedSimejiServiceIsRestored() throws Exception {
     var r = run("com.adamrocker.android.input.simeji/.Unknown", 0, 0, 0);
-    assertFalse(r.commands.contains("ime set"));
+    assertTrue(r.commands.contains("ime set"));
   }
 }

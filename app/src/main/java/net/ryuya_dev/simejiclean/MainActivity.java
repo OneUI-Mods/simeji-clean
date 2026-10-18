@@ -157,12 +157,15 @@ public final class MainActivity extends AppCompatActivity {
   }
 
   private void updateStatus() {
-    if (status == null) return;
+    if (status == null || isDestroyed()) return;
     boolean on = getSharedPreferences("config", 0).getBoolean("enabled", true);
     var p = getSharedPreferences("status", 0);
     long boot = System.currentTimeMillis() - SystemClock.elapsedRealtime();
     String state =
-        Math.abs(p.getLong("boot", 0) - boot) < 10000 ? p.getString("state", "pending") : "pending";
+        Math.abs(p.getLong("boot", 0) - boot) < 10000
+                && BuildConfig.BUILD_TOKEN.equals(p.getString("build", ""))
+            ? p.getString("state", "pending")
+            : "pending";
     if (!on) state = "off";
     int id =
         switch (state) {

@@ -45,11 +45,17 @@ public final class ConfigProvider extends ContentProvider {
         .contains(value)) throw new IllegalArgumentException("Unknown status");
     p.edit()
         .putString("state", value)
+        .putString("build", data.getString("build", ""))
         .putLong("boot", System.currentTimeMillis() - SystemClock.elapsedRealtime())
         .putLong("time", SystemClock.elapsedRealtime())
         .putInt("pid", Binder.getCallingPid())
         .apply();
-    getContext().getContentResolver().notifyChange(STATUS_URI, null);
+    long identity = Binder.clearCallingIdentity();
+    try {
+      getContext().getContentResolver().notifyChange(STATUS_URI, null);
+    } finally {
+      Binder.restoreCallingIdentity(identity);
+    }
     return Bundle.EMPTY;
   }
 

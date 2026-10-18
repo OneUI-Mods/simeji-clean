@@ -2,27 +2,26 @@ package net.ryuya_dev.simejiclean;
 
 import android.app.*;
 import android.content.*;
+import android.content.pm.*;
 import android.database.ContentObserver;
 import android.inputmethodservice.InputMethodService;
 import android.os.*;
+import android.provider.Settings;
 import android.view.inputmethod.EditorInfo;
 import io.github.libxposed.api.*;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.*;
+import java.lang.reflect.Method;
 import java.util.*;
-import org.jf.dexlib2.*;
-import org.jf.dexlib2.iface.instruction.ReferenceInstruction;
-import org.jf.dexlib2.iface.reference.MethodReference;
 
 public final class HookEntry extends XposedModule {
   private Context context;
   private volatile boolean enabled, failed, protectedMode;
-  private boolean installed;
+  private boolean installed, initializing, observing;
   private long epoch;
   private WeakReference<InputMethodService> ime = new WeakReference<>(null);
   private final Handler main = new Handler(Looper.getMainLooper());
-  private Class<?> popupType, managerType, serviceType;
-  private String process;
+  private String process, lastStatus = "";
+  private PopupDiscovery.Profile profile;
 
   @Override
   public void onModuleLoaded(XposedModuleInterface.ModuleLoadedParam p) {
@@ -32,9 +31,7 @@ public final class HookEntry extends XposedModule {
 
   @Override
   public void onPackageReady(XposedModuleInterface.PackageReadyParam p) {
-    if (!p.isFirstPackage()
-        || !ConfigProvider.HOST.equals(p.getPackageName())
-        || !ConfigProvider.HOST.equals(process)) return;
+    if (!p.isFirstPackage() || !ConfigProvider.HOST.equals(p.getPackageName())) return;
     ModernHook.findAndHookMethod(
         Application.class,
         "attach",
@@ -43,33 +40,108 @@ public final class HookEntry extends XposedModule {
           @Override
           protected void afterHookedMethod(ModernHook.Param call) {
             if (context == null)
-              initialize(
-                  (Context) call.args[0], p.getClassLoader(), p.getApplicationInfo().sourceDir);
+              bootstrap((Context) call.args[0], p.getClassLoader(), p.getApplicationInfo());
           }
         });
   }
 
-  private void initialize(Context c, ClassLoader loader, String apk) {
-    context = c;
+  private void bootstrap(Context c, ClassLoader loader, ApplicationInfo app) {
+    try {
+      var info =
+          c.getPackageManager().getPackageInfo(ConfigProvider.HOST, PackageManager.GET_SERVICES);
+      List<ServiceInfo> candidates = new ArrayList<>();
+      if (info.services != null)
+        for (ServiceInfo service : info.services)
+          if ("android.permission.BIND_INPUT_METHOD".equals(service.permission))
+            candidates.add(service);
+      ComponentName current =
+          ComponentName.unflattenFromString(
+              Objects.toString(
+                  Settings.Secure.getString(
+                      c.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD),
+                  ""));
+      if (candidates.size() > 1
+          && current != null
+          && ConfigProvider.HOST.equals(current.getPackageName()))
+        candidates.removeIf(service -> !service.name.equals(current.getClassName()));
+      if (candidates.size() != 1)
+        throw new IllegalStateException("IME service candidates=" + candidates.size());
+      ServiceInfo selected = candidates.get(0);
+      if (!Objects.equals(process, selected.processName)) return;
+      context = c;
+      Class<?> service = Class.forName(selected.name, false, loader);
+      if (!InputMethodService.class.isAssignableFrom(service))
+        throw new IllegalStateException("IME service changed");
+      Method start = service.getMethod("onStartInputView", EditorInfo.class, boolean.class);
+      if (!ModernHook.deoptimize(start))
+        throw new IllegalStateException("IME callback unavailable");
+      ModernHook.hookMethod(
+          start,
+          new ModernHook.Callback() {
+            @Override
+            protected void beforeHookedMethod(ModernHook.Param p) {
+              ime = new WeakReference<>((InputMethodService) p.thisObject);
+              // Retry setup on a real input-view event if a newly installed module had not been
+              // opened.
+              if (!installed && !failed && !protectedMode) initialize(loader, app);
+              else refresh();
+            }
+          });
+      initialize(loader, app);
+    } catch (Throwable error) {
+      failed = true;
+      enabled = false;
+      report("unsupported");
+      log("BOOTSTRAP_STOP " + error.getClass().getSimpleName());
+    }
+  }
+
+  private void initialize(ClassLoader loader, ApplicationInfo app) {
+    if (initializing || installed || failed || protectedMode) return;
+    initializing = true;
     try {
       if (!refresh()) return;
+      if (!observing) {
+        try {
+          context
+              .getContentResolver()
+              .registerContentObserver(
+                  ConfigProvider.URI,
+                  false,
+                  new ContentObserver(main) {
+                    @Override
+                    public void onChange(boolean self) {
+                      refresh();
+                    }
+                  });
+          observing = true;
+        } catch (RuntimeException unavailable) {
+          enabled = false;
+          log("CONFIG_UNAVAILABLE: open Simeji Clean, then show the keyboard again");
+          return;
+        }
+      }
       var guard =
-          c.createDeviceProtectedStorageContext()
+          context
+              .createDeviceProtectedStorageContext()
               .getSharedPreferences("net.ryuya_dev.simejiclean.guard", 0);
-      long now = SystemClock.elapsedRealtime();
-      long wall = System.currentTimeMillis(), boot = wall - now;
+      long now = SystemClock.elapsedRealtime(),
+          wall = System.currentTimeMillis(),
+          boot = wall - now;
       boolean sameEpoch = guard.getLong("epoch", -1) == epoch;
-      boolean recent =
-          StartupGuard.recent(guard.getLong("boot", 0), boot, guard.getLong("start", -1), now);
-      boolean crashed = false;
+      boolean
+          recent =
+              StartupGuard.recent(guard.getLong("boot", 0), boot, guard.getLong("start", -1), now),
+          crashed = false;
       if (sameEpoch && recent && !guard.getBoolean("blocked", false)) {
         var exits =
-            c.getSystemService(ActivityManager.class)
+            context
+                .getSystemService(ActivityManager.class)
                 .getHistoricalProcessExitReasons(null, guard.getInt("pid", -1), 1);
         if (!exits.isEmpty()) {
           var exit = exits.get(0);
           crashed =
-              ConfigProvider.HOST.equals(exit.getProcessName())
+              process.equals(exit.getProcessName())
                   && exit.getTimestamp() >= guard.getLong("wall", Long.MAX_VALUE)
                   && (exit.getReason() == ApplicationExitInfo.REASON_CRASH
                       || exit.getReason() == ApplicationExitInfo.REASON_CRASH_NATIVE);
@@ -93,134 +165,65 @@ public final class HookEntry extends XposedModule {
           .putLong("boot", boot)
           .putLong("epoch", epoch)
           .apply();
-      c.getContentResolver()
-          .registerContentObserver(
-              ConfigProvider.URI,
-              false,
-              new ContentObserver(main) {
-                @Override
-                public void onChange(boolean self) {
-                  refresh();
-                }
-              });
       if (protectedMode) {
         report("protected");
         return;
       }
-      serviceType =
-          Class.forName("com.adamrocker.android.input.simeji.OpenWnnSimeji", false, loader);
-      if (!InputMethodService.class.isAssignableFrom(serviceType))
-        throw new IllegalStateException("IME changed");
-      popupType = Class.forName("jp.baidu.simeji.ad.sug.pop.SugPopup", false, loader);
-      Class<?> contract = Class.forName("jp.baidu.simeji.ad.sug.SugContract$View", false, loader);
-      Class<?> popup = Class.forName("jp.baidu.simejicore.popup.IPopup", false, loader);
-      managerType = Class.forName("jp.baidu.simejicore.popup.PopupManager", false, loader);
-      if (!contract.isAssignableFrom(popupType) || !popup.isAssignableFrom(popupType))
-        throw new IllegalStateException("Popup contract changed");
-      Method check = managerType.getMethod("checkPopup", popup);
-      int cancel = managerType.getField("FLAG_CANCEL").getInt(null);
-      if (check.getReturnType() != int.class || cancel != 3)
-        throw new IllegalStateException("Cancel contract changed");
-      managerType.getMethod("closePopup", Class.class);
-      Method caller =
-          Class.forName("jp.baidu.simejicore.event.EventManager", false, loader)
-              .getMethod("popup", popup);
-      verifyCaller(apk, check, caller);
-      ModernHook.findAndHookMethod(
-          InputMethodService.class,
-          "onCreate",
-          new ModernHook.Callback() {
-            @Override
-            protected void afterHookedMethod(ModernHook.Param p) {
-              if (serviceType.isInstance(p.thisObject))
-                ime = new WeakReference<>((InputMethodService) p.thisObject);
-            }
-          });
-      Method inputStart =
-          serviceType.getMethod("onStartInputView", EditorInfo.class, boolean.class);
-      if (!ModernHook.deoptimize(inputStart))
-        throw new IllegalStateException("IME callback changed");
+      profile = PopupDiscovery.load(context, loader, app);
+      if (!ModernHook.deoptimize(profile.gate()))
+        throw new IllegalStateException("Gate deoptimization unavailable");
+      for (var caller : profile.callers())
+        if (!ModernHook.deoptimize(caller))
+          throw new IllegalStateException("Caller deoptimization unavailable");
       ModernHook.hookMethod(
-          inputStart,
+          profile.gate(),
           new ModernHook.Callback() {
             @Override
             protected void beforeHookedMethod(ModernHook.Param p) {
-              ime = new WeakReference<>((InputMethodService) p.thisObject);
-              refresh();
-            }
-          });
-      ModernHook.hookMethod(
-          check,
-          new ModernHook.Callback() {
-            @Override
-            protected void beforeHookedMethod(ModernHook.Param p) {
-              if (failed
-                  || protectedMode
-                  || !enabled
-                  || p.args[0] == null
-                  || p.args[0].getClass() != popupType) return;
+              if (p.args[0] == null || p.args[0].getClass() != profile.popup()) return;
+              if (failed || protectedMode || !enabled) return;
               try {
                 InputMethodService service = ime.get();
                 EditorInfo editor = service == null ? null : service.getCurrentInputEditorInfo();
                 if (editor != null && "com.android.vending".equals(editor.packageName)) {
-                  p.setResult(cancel);
+                  p.setResult(profile.cancel());
                   report("blocked");
                 }
               } catch (Throwable error) {
                 failed = true;
                 enabled = false;
                 report("error");
-                log("STOP " + error.getClass().getSimpleName());
+                log("HOOK_STOP " + error.getClass().getSimpleName());
               }
             }
           });
       installed = true;
       report(enabled ? "ready" : "off");
-      log("READY api=102; checked popup contract and DEX caller");
+      log("READY api=102 build=" + BuildConfig.BUILD_TOKEN);
     } catch (Throwable error) {
       failed = true;
       enabled = false;
       report("unsupported");
-      log("UNSUPPORTED " + error.getClass().getSimpleName());
-      android.util.Log.e("SimejiClean", "Initialization failed", error);
+      log("DISCOVERY_STOP " + error.getClass().getSimpleName() + ": " + error.getMessage());
+    } finally {
+      initializing = false;
     }
   }
 
-  private void verifyCaller(String apk, Method check, Method caller) throws Exception {
-    String owner = "L" + caller.getDeclaringClass().getName().replace('.', '/') + ";";
-    String target = "L" + check.getDeclaringClass().getName().replace('.', '/') + ";";
-    boolean found = false;
-    var dex = DexFileFactory.loadDexContainer(new java.io.File(apk), Opcodes.getDefault());
-    for (String entry : dex.getDexEntryNames())
-      for (var type : dex.getEntry(entry).getDexFile().getClasses()) {
-        if (!owner.equals(type.getType())) continue;
-        for (var method : type.getMethods())
-          if (method.getName().equals(caller.getName()) && method.getImplementation() != null)
-            for (var instruction : method.getImplementation().getInstructions())
-              if (instruction instanceof ReferenceInstruction r
-                  && r.getReference() instanceof MethodReference ref
-                  && target.equals(ref.getDefiningClass())
-                  && check.getName().equals(ref.getName())) found = true;
-      }
-    if (!found || !ModernHook.deoptimize(check) || !ModernHook.deoptimize(caller))
-      throw new IllegalStateException("Popup call path changed");
-  }
-
   private boolean refresh() {
+    if (context == null) return false;
     try (var cursor =
         context.getContentResolver().query(ConfigProvider.URI, null, null, null, null)) {
       if (cursor == null || !cursor.moveToFirst())
         throw new IllegalStateException("Configuration unavailable");
+      boolean wasEnabled = enabled;
       enabled = !failed && cursor.getInt(0) != 0;
       epoch = cursor.getLong(1);
-      if (ime.get() != null && enabled && !protectedMode) {
-        var editor = ime.get().getCurrentInputEditorInfo();
-        if (editor != null
-            && "com.android.vending".equals(editor.packageName)
-            && managerType != null)
-          managerType
-              .getMethod("closePopup", Class.class)
-              .invoke(managerType.getMethod("getInstance").invoke(null), popupType);
+      InputMethodService service = ime.get();
+      if (!wasEnabled && enabled && !protectedMode && profile != null && service != null) {
+        var editor = service.getCurrentInputEditorInfo();
+        if (editor != null && "com.android.vending".equals(editor.packageName))
+          profile.closer().invoke(profile.accessor().invoke(null), profile.popup());
       }
       if (installed || protectedMode)
         report(protectedMode ? "protected" : failed ? "error" : enabled ? "ready" : "off");
@@ -228,18 +231,17 @@ public final class HookEntry extends XposedModule {
     } catch (Throwable error) {
       enabled = false;
       report("error");
-      log("CONFIG_UNAVAILABLE: open Simeji Clean, then reload Simeji");
+      log("CONFIG_UNAVAILABLE: open Simeji Clean, then show the keyboard again");
       return false;
     }
   }
-
-  private String lastStatus = "";
 
   private void report(String state) {
     if (context == null || state.equals(lastStatus)) return;
     try {
       Bundle data = new Bundle();
       data.putString("state", state);
+      data.putString("build", BuildConfig.BUILD_TOKEN);
       context.getContentResolver().call(ConfigProvider.URI, "status", null, data);
       lastStatus = state;
       log("STATE " + state);
@@ -247,8 +249,8 @@ public final class HookEntry extends XposedModule {
     }
   }
 
-  static void log(String text) {
-    ModernHook.log(text);
-    android.util.Log.i("SimejiClean", text);
+  static void log(String message) {
+    ModernHook.log(message);
+    android.util.Log.i("SimejiClean", message);
   }
 }

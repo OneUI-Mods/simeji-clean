@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.security.MessageDigest
 
 plugins { id("com.android.application") }
 val distributionProperties = Properties().apply {
@@ -9,6 +10,12 @@ val distributionProperties = Properties().apply {
         }
     }
 }
+val buildDigest = MessageDigest.getInstance("SHA-256")
+for (source in fileTree("src/main").files.sortedBy { it.relativeTo(projectDir).path }) {
+    buildDigest.update(source.relativeTo(projectDir).path.toByteArray())
+    buildDigest.update(source.readBytes())
+}
+val buildToken = buildDigest.digest().joinToString("") { "%02x".format(it) }.take(20)
 android {
     namespace = "net.ryuya_dev.simejiclean"
     compileSdk = 36
@@ -19,6 +26,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "BUILD_TOKEN", "\"$buildToken\"")
     }
     signingConfigs {
         if (!distributionProperties.isEmpty) create("distribution") {
@@ -47,6 +55,7 @@ dependencies {
     implementation("org.smali:dexlib2:2.5.2")
     implementation("com.google.android.material:material:1.14.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.guava:guava:27.1-android")
 }
 
 val exportRuntimeComponents = tasks.register("exportRuntimeComponents") {
