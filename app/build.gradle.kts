@@ -1,24 +1,33 @@
-import java.util.Properties
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins { id("com.android.application") }
-val distributionProperties = Properties().apply {
-    providers.environmentVariable("SIMEJI_CLEAN_SIGNING_PROPERTIES").orNull?.let { path ->
-        file(path).inputStream().use { load(it) }
-        for (key in listOf("storeFile", "storePassword", "keyAlias", "keyPassword")) {
-            check(!getProperty(key).isNullOrBlank()) { "Missing release signing property: $key" }
+
+val distributionProperties =
+    Properties().apply {
+        providers.environmentVariable("SIMEJI_CLEAN_SIGNING_PROPERTIES").orNull?.let { path ->
+            file(path).inputStream().use { load(it) }
+            for (key in listOf("storeFile", "storePassword", "keyAlias", "keyPassword")) {
+                check(!getProperty(key).isNullOrBlank()) {
+                    "Missing release signing property: $key"
+                }
+            }
         }
     }
-}
 val buildDigest = MessageDigest.getInstance("SHA-256")
+
 for (source in fileTree("src/main").files.sortedBy { it.relativeTo(projectDir).path }) {
     buildDigest.update(source.relativeTo(projectDir).path.toByteArray())
     buildDigest.update(source.readBytes())
 }
+
 val buildToken = buildDigest.digest().joinToString("") { "%02x".format(it) }.take(20)
+
 android {
     namespace = "net.ryuya_dev.simejiclean"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
     buildFeatures { buildConfig = true }
     defaultConfig {
         applicationId = "net.ryuya_dev.simejiclean"
@@ -29,12 +38,13 @@ android {
         buildConfigField("String", "BUILD_TOKEN", "\"$buildToken\"")
     }
     signingConfigs {
-        if (!distributionProperties.isEmpty) create("distribution") {
-            storeFile = file(distributionProperties.getProperty("storeFile"))
-            storePassword = distributionProperties.getProperty("storePassword")
-            keyAlias = distributionProperties.getProperty("keyAlias")
-            keyPassword = distributionProperties.getProperty("keyPassword")
-        }
+        if (!distributionProperties.isEmpty)
+            create("distribution") {
+                storeFile = file(distributionProperties.getProperty("storeFile"))
+                storePassword = distributionProperties.getProperty("storePassword")
+                keyAlias = distributionProperties.getProperty("keyAlias")
+                keyPassword = distributionProperties.getProperty("keyPassword")
+            }
     }
     buildTypes {
         release {
@@ -50,48 +60,85 @@ android {
     }
     lint { abortOnError = true }
 }
+
 dependencies {
     compileOnly("io.github.libxposed:api:102.0.0")
     implementation("org.smali:dexlib2:2.5.2")
     implementation("com.google.android.material:material:1.14.0")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("com.google.guava:guava:27.1-android")
+    testImplementation("com.google.guava:guava:33.8.0-android")
 }
 
-val exportRuntimeComponents = tasks.register("exportRuntimeComponents") {
-    doLast {
-        val components = configurations.getByName("debugRuntimeClasspath").resolvedConfiguration.resolvedArtifacts
-            .map { it.moduleVersion.id.toString() }.toSortedSet()
-        val file = layout.buildDirectory.file("runtime-components.txt").get().asFile
-        file.parentFile.mkdirs(); file.writeText(components.joinToString("\n") + "\n")
-    }
-}
-val generatedLicenses = layout.buildDirectory.dir("generated/licenseAssets")
-android.sourceSets.getByName("main").assets.directories.add(generatedLicenses.get().asFile.absolutePath)
-val dependencyLicenses = tasks.register("generateDependencyLicenses") {
-    dependsOn(exportRuntimeComponents)
-    inputs.file(rootProject.file("third_party/components.tsv"))
-    inputs.dir(rootProject.file("third_party"))
-    inputs.file(rootProject.file("LICENSE"))
-    inputs.file(layout.buildDirectory.file("runtime-components.txt"))
-    outputs.dir(generatedLicenses)
-    doLast {
-        val rows = rootProject.file("third_party/components.tsv").readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split('\t') }
-        val licensed = rows.map { it[0] }.toSet()
-        val actual = layout.buildDirectory.file("runtime-components.txt").get().asFile.readLines().filter { it.isNotBlank() }.toSet() + "io.github.libxposed:api:102.0.0"
-        check(actual == licensed) { "Review dependency licenses: missing=${actual-licensed}; obsolete=${licensed-actual}" }
-        val out = generatedLicenses.get().asFile; out.mkdirs()
-        rootProject.file("LICENSE").copyTo(out.resolve("APP_LICENSE.txt"),true)
-        val notices = buildString {
-            append("Bundled runtime dependencies (including transitive dependencies), plus compile-only Xposed API.\n\n")
-            append("AndroidX / Material: The Android Open Source Project and respective contributors.\nKotlin / coroutines / annotations: JetBrains and respective contributors.\nGuava / Error Prone / J2ObjC / JSpecify: Google and respective contributors.\nlibxposed API: libxposed contributors.\n\n")
-            for (row in rows) append(row[0]+"\n"+row[1]+"\n"+row.getOrElse(3){""}+"\n\n")
-            for (name in rows.map { it[2] }.distinct()) {
-                append("\n===== $name =====\n\n")
-                append(rootProject.file("third_party/$name").readText())
-            }
+val exportRuntimeComponents =
+    tasks.register("exportRuntimeComponents") {
+        doLast {
+            val components =
+                configurations
+                    .getByName("debugRuntimeClasspath")
+                    .resolvedConfiguration
+                    .resolvedArtifacts
+                    .map { it.moduleVersion.id.toString() }
+                    .toSortedSet()
+            val file = layout.buildDirectory.file("runtime-components.txt").get().asFile
+            file.parentFile.mkdirs()
+            file.writeText(components.joinToString("\n") + "\n")
         }
-        out.resolve("THIRD_PARTY_NOTICES.txt").writeText(notices)
     }
-}
+val generatedLicenses = layout.buildDirectory.dir("generated/licenseAssets")
+
+android.sourceSets
+    .getByName("main")
+    .assets
+    .directories
+    .add(generatedLicenses.get().asFile.absolutePath)
+
+val dependencyLicenses =
+    tasks.register("generateDependencyLicenses") {
+        dependsOn(exportRuntimeComponents)
+        inputs.file(rootProject.file("third_party/components.tsv"))
+        inputs.dir(rootProject.file("third_party"))
+        inputs.file(rootProject.file("LICENSE"))
+        inputs.file(layout.buildDirectory.file("runtime-components.txt"))
+        outputs.dir(generatedLicenses)
+        doLast {
+            val rows =
+                rootProject
+                    .file("third_party/components.tsv")
+                    .readLines()
+                    .filter { it.isNotBlank() && !it.startsWith("#") }
+                    .map { it.split('\t') }
+            val licensed = rows.map { it[0] }.toSet()
+            val actual =
+                layout.buildDirectory
+                    .file("runtime-components.txt")
+                    .get()
+                    .asFile
+                    .readLines()
+                    .filter { it.isNotBlank() }
+                    .toSet() + "io.github.libxposed:api:102.0.0"
+            check(actual == licensed) {
+                "Review dependency licenses: missing=${actual-licensed}; obsolete=${licensed-actual}"
+            }
+            val out = generatedLicenses.get().asFile
+            out.mkdirs()
+            rootProject.file("LICENSE").copyTo(out.resolve("APP_LICENSE.txt"), true)
+            val notices = buildString {
+                append(
+                    "Bundled runtime dependencies (including transitive dependencies), plus compile-only Xposed API.\n\n",
+                )
+                append(
+                    "AndroidX / Material: The Android Open Source Project and respective contributors.\nKotlin / coroutines / annotations: JetBrains and respective contributors.\nGuava / Error Prone / J2ObjC / JSpecify: Google and respective contributors.\nlibxposed API: libxposed contributors.\n\n",
+                )
+                for (row in rows) append(
+                    row[0] + "\n" + row[1] + "\n" + row.getOrElse(3) { "" } + "\n\n",
+                )
+                for (name in rows.map { it[2] }.distinct()) {
+                    append("\n===== $name =====\n\n")
+                    append(rootProject.file("third_party/$name").readText())
+                }
+            }
+            out.resolve("THIRD_PARTY_NOTICES.txt").writeText(notices)
+        }
+    }
+
 tasks.named("preBuild").configure { dependsOn(dependencyLicenses) }

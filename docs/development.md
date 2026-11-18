@@ -4,7 +4,7 @@
 
 開発フォルダは `~/Documents/SimejiClean`。パッケージは所有ドメインryuya-dev.netに基づく `net.ryuya_dev.simejiclean`。One UI Home Tweaksとは独立したアプリです。
 
-JDK 21、Android SDK 36、Gradle Wrapperを使用します。
+JDK 27、Android SDK 37.2、Gradle Wrapperを使用します。
 
 ```sh
 ./gradlew :app:assembleRelease :app:testDebugUnitTest :app:lintRelease
@@ -51,3 +51,5 @@ adb logcat -s SimejiClean:I '*:S'
 ```
 
 ログは`DISCOVERY_FOUND`、`DISCOVERY_CACHE_HIT`、`READY`、`STATE blocked/off/ready`、`CONFIG_UNAVAILABLE`、`DISCOVERY_STOP`などで確認します。
+
+[Build environment / ビルド環境](build-environment.md)

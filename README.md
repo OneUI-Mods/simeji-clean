@@ -46,3 +46,5 @@ Playストア、SystemUI、Androidシステム、他の入力先アプリをス�
 通信を遮断する機能ではありません。入力内容や変換候補は取得・記録せず、入力先のパッケージ名だけで適用を判断します。本アプリは通信権限を要求しません。
 
 [実機確認記録](docs/testing.md)と[開発・解析資料](docs/development.md)を参照してください。
+
+[Build environment / ビルド環境](docs/build-environment.md)
