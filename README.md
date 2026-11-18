@@ -1,5 +1,7 @@
 # Simeji Clean
 
+[English](README.en.md)
+
 SimejiでGoogle Playの検索欄を開いたとき、キーボードの上に出る白い広告・アプリおすすめパネルを非表示にするXposedモジュールです。
 
 通常のキー、スキン、変換候補は対象外です。Google Play以外の入力欄と、Playストア本体の広告には変更を加えません。
@@ -26,7 +28,7 @@ SimejiでGoogle Playの検索欄を開いたとき、キーボードの上に出
 
 ## 導入
 
-1. [Releases](https://github.com/ryuya0124/simeji-clean/releases)の署名済みAPKをインストールし、**Simeji Cleanを一度開きます**。
+1. [Releases](https://github.com/OneUI-Mods/simeji-clean/releases)の署名済みAPKをインストールし、**Simeji Cleanを一度開きます**。
 2. VectorでSimeji Cleanを有効にし、スコープに**Simejiだけ**を追加します。
 3. Simejiを読み込み直し、Playストアの検索欄を開きます。端末・ソフト再起動は不要です。
 4. アプリの状態表示と、実際に白いパネルが表示されないことを確認します。
