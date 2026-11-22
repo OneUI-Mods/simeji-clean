@@ -13,10 +13,12 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.*;
 
-public final class HookEntry extends XposedModule {
+public class HookEntry extends XposedModule {
   private Context context;
-  private volatile boolean enabled, failed, protectedMode;
-  private boolean installed, initializing, observing;
+  private volatile boolean enabled, failed, protectedMode, retired;
+  private boolean installed, initializing;
+  private volatile ClassLoader hostLoader;
+  private ContentObserver observer;
   private long epoch;
   private WeakReference<InputMethodService> ime = new WeakReference<>(null);
   private final Handler main = new Handler(Looper.getMainLooper());
@@ -45,7 +47,8 @@ public final class HookEntry extends XposedModule {
         });
   }
 
-  private void bootstrap(Context c, ClassLoader loader, ApplicationInfo app) {
+  protected final synchronized boolean bootstrap(Context c, ClassLoader loader, ApplicationInfo app) {
+    if (retired) return false;
     try {
       var info =
           c.getPackageManager().getPackageInfo(ConfigProvider.HOST, PackageManager.GET_SERVICES);
@@ -67,8 +70,9 @@ public final class HookEntry extends XposedModule {
       if (candidates.size() != 1)
         throw new IllegalStateException("IME service candidates=" + candidates.size());
       ServiceInfo selected = candidates.get(0);
-      if (!Objects.equals(process, selected.processName)) return;
+      if (!Objects.equals(process, selected.processName)) return false;
       context = c;
+      hostLoader = loader;
       Class<?> service = Class.forName(selected.name, false, loader);
       if (!InputMethodService.class.isAssignableFrom(service))
         throw new IllegalStateException("IME service changed");
@@ -80,6 +84,7 @@ public final class HookEntry extends XposedModule {
           new ModernHook.Callback() {
             @Override
             protected void beforeHookedMethod(ModernHook.Param p) {
+              if (retired) return;
               ime = new WeakReference<>((InputMethodService) p.thisObject);
               // Retry setup on a real input-view event if a newly installed module had not been
               // opened.
@@ -88,33 +93,53 @@ public final class HookEntry extends XposedModule {
             }
           });
       initialize(loader, app);
+      return installed;
     } catch (Throwable error) {
       failed = true;
       enabled = false;
       report("unsupported");
       log("BOOTSTRAP_STOP " + error.getClass().getSimpleName());
+      return false;
     }
   }
 
-  private void initialize(ClassLoader loader, ApplicationInfo app) {
-    if (initializing || installed || failed || protectedMode) return;
+  protected final synchronized Object[] prepareLiveUpdate() {
+    if (retired || initializing || !installed || hostLoader == null || protectedMode) return null;
+    return new Object[] {context, hostLoader, ime.get()};
+  }
+
+  protected final synchronized void retireLiveUpdate() {
+    retired = true;
+    main.removeCallbacksAndMessages(null);
+    if (observer != null) {
+      try {
+        context.getContentResolver().unregisterContentObserver(observer);
+      } catch (RuntimeException ignored) {
+      } finally {
+        observer = null;
+      }
+    }
+  }
+
+  protected final void restoreInputMethod(InputMethodService service) {
+    ime = new WeakReference<>(service);
+  }
+
+  private synchronized void initialize(ClassLoader loader, ApplicationInfo app) {
+    if (retired || initializing || installed || failed || protectedMode) return;
     initializing = true;
     try {
       if (!refresh()) return;
-      if (!observing) {
+      if (observer == null) {
         try {
-          context
-              .getContentResolver()
-              .registerContentObserver(
-                  ConfigProvider.URI,
-                  false,
-                  new ContentObserver(main) {
-                    @Override
-                    public void onChange(boolean self) {
-                      refresh();
-                    }
-                  });
-          observing = true;
+          ContentObserver config = new ContentObserver(main) {
+            @Override
+            public void onChange(boolean self) {
+              if (!retired) refresh();
+            }
+          };
+          context.getContentResolver().registerContentObserver(ConfigProvider.URI, false, config);
+          observer = config;
         } catch (RuntimeException unavailable) {
           enabled = false;
           log("CONFIG_UNAVAILABLE: open Simeji Clean, then show the keyboard again");
@@ -181,7 +206,7 @@ public final class HookEntry extends XposedModule {
             @Override
             protected void beforeHookedMethod(ModernHook.Param p) {
               if (p.args[0] == null || p.args[0].getClass() != profile.popup()) return;
-              if (failed || protectedMode || !enabled) return;
+              if (retired || failed || protectedMode || !enabled) return;
               try {
                 InputMethodService service = ime.get();
                 EditorInfo editor = service == null ? null : service.getCurrentInputEditorInfo();
@@ -211,7 +236,7 @@ public final class HookEntry extends XposedModule {
   }
 
   private boolean refresh() {
-    if (context == null) return false;
+    if (retired || context == null) return false;
     try (var cursor =
         context.getContentResolver().query(ConfigProvider.URI, null, null, null, null)) {
       if (cursor == null || !cursor.moveToFirst())

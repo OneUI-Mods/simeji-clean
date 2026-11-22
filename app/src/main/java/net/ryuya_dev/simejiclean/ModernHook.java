@@ -52,6 +52,7 @@ final class ModernHook {
     XposedInterface.HookHandle handle =
         requireModule()
             .hook(executable)
+            .setId("simeji-clean")
             .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
             .intercept(
                 chain -> {
@@ -79,6 +80,7 @@ final class ModernHook {
     XposedInterface.HookHandle handle =
         requireModule()
             .hook(executable)
+            .setId("simeji-clean")
             .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
             .intercept(around::run);
     return handle::unhook;

@@ -33,8 +33,8 @@ android {
         applicationId = "net.ryuya_dev.simejiclean"
         minSdk = 31
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
         buildConfigField("String", "BUILD_TOKEN", "\"$buildToken\"")
     }
     signingConfigs {
