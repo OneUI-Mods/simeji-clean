@@ -45,7 +45,7 @@ def main():
         assert 'assets/THIRD_PARTY_NOTICES.txt' in archive.namelist()
     badging = run(tools / 'aapt2', 'dump', 'badging', apk, capture=True).stdout
     assert "name='net.ryuya_dev.simejiclean'" in badging
-    assert "minSdkVersion:'37'" in badging and "targetSdkVersion:'37'" in badging
+    assert "minSdkVersion:'31'" in badging and "targetSdkVersion:'36'" in badging
     assert 'application-debuggable' not in badging
     signature = run(tools / 'apksigner', 'verify', '--verbose', '--print-certs', apk, capture=True).stdout
     assert CERTIFICATE in signature

@@ -1,14 +1,12 @@
 # Simeji Clean
 
-Installation requires Android 17 (API 37) or later.
-
 [日本語](README.md)
 
 Hide the supported promotional panel above the Simeji keyboard when entering Google Play search. Normal keys, skins and conversion suggestions remain available. It does not modify Google Play itself or panels in unrelated input fields.
 
 ## Requirements
 
-- Android 17 or later, with root and a compatible libxposed API 102 framework such as Vector.
+- Android 12 or later, with root and a compatible libxposed API 102 framework such as Vector.
 - A supported version of Simeji (`com.adamrocker.android.input.simeji`).
 
 ## Installation

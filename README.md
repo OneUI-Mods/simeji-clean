@@ -1,7 +1,5 @@
 # Simeji Clean
 
-インストールにはAndroid 17（API 37）以降が必要です。
-
 [English](README.en.md)
 
 SimejiでGoogle Playの検索欄を開いたとき、キーボードの上に出る白い広告・アプリおすすめパネルを非表示にするXposedモジュールです。
@@ -22,7 +20,7 @@ SimejiでGoogle Playの検索欄を開いたとき、キーボードの上に出
 
 ## 必要な環境
 
-- Android 17以降。
+- Android 12以降。
 - modern libxposed API 102に対応したVector等の環境。legacy API 82には対応していません。
 - Simeji（`com.adamrocker.android.input.simeji`）。実機の解析元は23.6.1／versionCode 966です。
 
