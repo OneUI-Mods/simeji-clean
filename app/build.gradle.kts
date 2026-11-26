@@ -31,10 +31,10 @@ android {
     buildFeatures { buildConfig = true }
     defaultConfig {
         applicationId = "net.ryuya_dev.simejiclean"
-        minSdk = 31
-        targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.2"
+        minSdk = 37
+        targetSdk = 37
+        versionCode = 4
+        versionName = "0.1.3"
         buildConfigField("String", "BUILD_TOKEN", "\"$buildToken\"")
     }
     signingConfigs {
