@@ -24,4 +24,5 @@
 <string name="reset">重設當機保護</string>
 <string name="reset_done">下次重新載入 Simeji 時將重設保護</string>
 <string name="privacy">不申請網路權限，不記錄輸入內容或轉換候選。</string>
+    <string name="config_save_failed">無法儲存設定。請檢查 Vector 連線。</string>
 </resources>

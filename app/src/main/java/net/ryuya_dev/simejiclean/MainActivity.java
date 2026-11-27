@@ -23,6 +23,12 @@ public final class MainActivity extends AppCompatActivity {
   private TextView status, root, detail;
   private ImageView badge;
   private MaterialButton reload;
+  private MaterialSwitch toggle;
+  private SimejiCleanApplication application;
+  private final SharedPreferences.OnSharedPreferenceChangeListener configChanges =
+      (preferences, key) -> {
+        if ("enabled".equals(key)) refreshToggle();
+      };
   private final ContentObserver observer =
       new ContentObserver(new Handler(Looper.getMainLooper())) {
         @Override
@@ -39,6 +45,7 @@ public final class MainActivity extends AppCompatActivity {
   public void onCreate(Bundle state) {
     DynamicColors.applyToActivityIfAvailable(this);
     super.onCreate(state);
+    application = (SimejiCleanApplication) getApplication();
     EdgeToEdge.enable(this);
     ScrollView scroll = new ScrollView(this);
     LinearLayout page = new LinearLayout(this);
@@ -75,16 +82,21 @@ public final class MainActivity extends AppCompatActivity {
     box.addView(status);
     detail = text(R.string.pending_note, 14);
     box.addView(detail);
-    MaterialSwitch toggle = new MaterialSwitch(this);
+    toggle = new MaterialSwitch(this);
     toggle.setText(R.string.enabled);
     toggle.setChecked(getSharedPreferences("config", 0).getBoolean("enabled", true));
     page.addView(toggle, new LinearLayout.LayoutParams(-1, dp(72)));
     page.addView(text(R.string.scope, 15));
     toggle.setOnCheckedChangeListener(
         (v, on) -> {
-          getSharedPreferences("config", 0).edit().putBoolean("enabled", on).apply();
-          getContentResolver().notifyChange(ConfigProvider.URI, null);
-          updateStatus();
+          ConfigSnapshot config = ConfigSnapshot.local(application.localConfig());
+          if (config.enabled() == on) return;
+          if (!application.saveConfig(new ConfigSnapshot(on, config.epoch()))) {
+            refreshToggle();
+            Toast.makeText(this, R.string.config_save_failed, Toast.LENGTH_LONG).show();
+          } else {
+            updateStatus();
+          }
         });
     root = text(R.string.root_request, 14);
     LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
@@ -102,12 +114,11 @@ public final class MainActivity extends AppCompatActivity {
     button(R.string.reset, page)
         .setOnClickListener(
             v -> {
-              getSharedPreferences("config", 0)
-                  .edit()
-                  .putLong("epoch", System.currentTimeMillis())
-                  .apply();
-              getContentResolver().notifyChange(ConfigProvider.URI, null);
-              Toast.makeText(this, R.string.reset_done, Toast.LENGTH_LONG).show();
+              var current = ConfigSnapshot.local(application.localConfig());
+              boolean saved = application.saveConfig(
+                  new ConfigSnapshot(current.enabled(), System.currentTimeMillis()));
+              Toast.makeText(this, saved ? R.string.reset_done : R.string.config_save_failed,
+                  Toast.LENGTH_LONG).show();
             });
     if (Build.VERSION.SDK_INT >= 33)
       button(R.string.language, page)
@@ -147,13 +158,21 @@ public final class MainActivity extends AppCompatActivity {
   protected void onResume() {
     super.onResume();
     getContentResolver().registerContentObserver(ConfigProvider.STATUS_URI, false, observer);
-    updateStatus();
+    application.localConfig().registerOnSharedPreferenceChangeListener(configChanges);
+    refreshToggle();
   }
 
   @Override
   protected void onPause() {
+    application.localConfig().unregisterOnSharedPreferenceChangeListener(configChanges);
     getContentResolver().unregisterContentObserver(observer);
     super.onPause();
+  }
+
+  private void refreshToggle() {
+    if (toggle == null || isDestroyed()) return;
+    toggle.setChecked(ConfigSnapshot.local(application.localConfig()).enabled());
+    updateStatus();
   }
 
   private void updateStatus() {

@@ -24,4 +24,5 @@
 <string name="reset">クラッシュ保護を解除</string>
 <string name="reset_done">次のSimeji読み込み直しで保護を解除します</string>
 <string name="privacy">通信権限は要求しません。入力内容・変換候補を記録しません。</string>
+    <string name="config_save_failed">設定を保存できませんでした。Vectorへの接続を確認してください。</string>
 </resources>

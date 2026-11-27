@@ -24,4 +24,5 @@
 <string name="reset">충돌 보호 해제</string>
 <string name="reset_done">다음 Simeji 로드 시 보호가 해제됩니다</string>
 <string name="privacy">네트워크 권한을 요청하지 않으며 입력 내용이나 변환 후보를 기록하지 않습니다.</string>
+    <string name="config_save_failed">설정을 저장하지 못했습니다. Vector 연결을 확인하세요.</string>
 </resources>

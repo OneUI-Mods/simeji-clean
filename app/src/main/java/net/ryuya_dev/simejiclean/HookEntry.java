@@ -19,10 +19,17 @@ public class HookEntry extends XposedModule {
   private boolean installed, initializing;
   private volatile ClassLoader hostLoader;
   private ContentObserver observer;
+  private final Handler main = new Handler(Looper.getMainLooper());
+  private SharedPreferences remote;
+  private boolean usingRemote;
+  private final SharedPreferences.OnSharedPreferenceChangeListener remoteChanges =
+      (preferences, key) -> {
+        if (key == null || ConfigSnapshot.KEY.equals(key)) main.post(this::refresh);
+      };
   private long epoch;
   private WeakReference<InputMethodService> ime = new WeakReference<>(null);
-  private final Handler main = new Handler(Looper.getMainLooper());
-  private String process, lastStatus = "";
+  private String process, currentStatus = "", deliveredStatus = "";
+  private long nextStatusRetry;
   private PopupDiscovery.Profile profile;
 
   @Override
@@ -110,7 +117,15 @@ public class HookEntry extends XposedModule {
 
   protected final synchronized void retireLiveUpdate() {
     retired = true;
+    if (remote != null) {
+      remote.unregisterOnSharedPreferenceChangeListener(remoteChanges);
+      remote = null;
+    }
     main.removeCallbacksAndMessages(null);
+    detachObserver();
+  }
+
+  private void detachObserver() {
     if (observer != null) {
       try {
         context.getContentResolver().unregisterContentObserver(observer);
@@ -130,7 +145,7 @@ public class HookEntry extends XposedModule {
     initializing = true;
     try {
       if (!refresh()) return;
-      if (observer == null) {
+      if (!usingRemote && observer == null) {
         try {
           ContentObserver config = new ContentObserver(main) {
             @Override
@@ -235,15 +250,42 @@ public class HookEntry extends XposedModule {
     }
   }
 
-  private boolean refresh() {
-    if (retired || context == null) return false;
+  private ConfigSnapshot readConfig() {
+    if (remote == null) {
+      try {
+        var preferences = getRemotePreferences(ConfigSnapshot.GROUP);
+        preferences.registerOnSharedPreferenceChangeListener(remoteChanges);
+        remote = preferences;
+      } catch (RuntimeException | LinkageError unavailable) {
+        // Frameworks without remote preferences continue using the existing provider.
+      }
+    }
+    if (remote != null) {
+      ConfigSnapshot config = ConfigSnapshot.remote(remote);
+      if (config != null) {
+        if (!usingRemote) {
+          usingRemote = true;
+          detachObserver();
+          log("CONFIG_SOURCE vector");
+        }
+        return config;
+      }
+    }
     try (var cursor =
         context.getContentResolver().query(ConfigProvider.URI, null, null, null, null)) {
       if (cursor == null || !cursor.moveToFirst())
         throw new IllegalStateException("Configuration unavailable");
+      return new ConfigSnapshot(cursor.getInt(0) != 0, cursor.getLong(1));
+    }
+  }
+
+  private boolean refresh() {
+    if (retired || context == null) return false;
+    try {
+      ConfigSnapshot config = readConfig();
       boolean wasEnabled = enabled;
-      enabled = !failed && cursor.getInt(0) != 0;
-      epoch = cursor.getLong(1);
+      enabled = !failed && config.enabled();
+      epoch = config.epoch();
       InputMethodService service = ime.get();
       if (!wasEnabled && enabled && !protectedMode && profile != null && service != null) {
         var editor = service.getCurrentInputEditorInfo();
@@ -262,15 +304,34 @@ public class HookEntry extends XposedModule {
   }
 
   private void report(String state) {
-    if (context == null || state.equals(lastStatus)) return;
+    if (context == null) return;
+    if (!state.equals(currentStatus)) {
+      currentStatus = state;
+      log("STATE " + state);
+    }
+    long now = SystemClock.elapsedRealtime();
+    if (state.equals(deliveredStatus) || now < nextStatusRetry) return;
     try {
       Bundle data = new Bundle();
       data.putString("state", state);
       data.putString("build", BuildConfig.BUILD_TOKEN);
+      if (usingRemote && !companionAvailable()) {
+        nextStatusRetry = now + 5000;
+        return;
+      }
       context.getContentResolver().call(ConfigProvider.URI, "status", null, data);
-      lastStatus = state;
-      log("STATE " + state);
+      deliveredStatus = state;
     } catch (RuntimeException ignored) {
+      nextStatusRetry = now + 5000;
+    }
+  }
+
+  private boolean companionAvailable() {
+    try {
+      var app = context.getPackageManager().getApplicationInfo(BuildConfig.APPLICATION_ID, 0);
+      return app.enabled && (app.flags & ApplicationInfo.FLAG_STOPPED) == 0;
+    } catch (PackageManager.NameNotFoundException unavailable) {
+      return false;
     }
   }
 

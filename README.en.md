@@ -1,5 +1,7 @@
 # Simeji Clean
 
+With Vector preferences set up, filtering starts automatically in Simeji even when the companion app is stopped.
+
 [日本語](README.md)
 
 Hide the supported promotional panel above the Simeji keyboard when entering Google Play search. Normal keys, skins and conversion suggestions remain available. It does not modify Google Play itself or panels in unrelated input fields.

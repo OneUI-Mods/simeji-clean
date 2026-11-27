@@ -33,8 +33,8 @@ android {
         applicationId = "net.ryuya_dev.simejiclean"
         minSdk = 31
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 6
+        versionName = "0.1.5"
         buildConfigField("String", "BUILD_TOKEN", "\"$buildToken\"")
     }
     signingConfigs {
@@ -63,6 +63,7 @@ android {
 
 dependencies {
     compileOnly("io.github.libxposed:api:102.0.0")
+    implementation("io.github.libxposed:service:102.0.0")
     implementation("org.smali:dexlib2:2.5.2")
     implementation("com.google.android.material:material:1.14.0")
     testImplementation("junit:junit:4.13.2")
@@ -127,7 +128,7 @@ val dependencyLicenses =
                     "Bundled runtime dependencies (including transitive dependencies), plus compile-only Xposed API.\n\n",
                 )
                 append(
-                    "AndroidX / Material: The Android Open Source Project and respective contributors.\nKotlin / coroutines / annotations: JetBrains and respective contributors.\nGuava / Error Prone / J2ObjC / JSpecify: Google and respective contributors.\nlibxposed API: libxposed contributors.\n\n",
+                    "AndroidX / Material: The Android Open Source Project and respective contributors.\nKotlin / coroutines / annotations: JetBrains and respective contributors.\nGuava / Error Prone / J2ObjC / JSpecify: Google and respective contributors.\nlibxposed API and service: libxposed contributors.\n\n",
                 )
                 for (row in rows) append(
                     row[0] + "\n" + row[1] + "\n" + row.getOrElse(3) { "" } + "\n\n",

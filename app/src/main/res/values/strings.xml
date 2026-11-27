@@ -24,4 +24,5 @@
 <string name="reset">Reset crash protection</string>
 <string name="reset_done">Protection will reset when Simeji is next reloaded</string>
 <string name="privacy">No network permission. Typed text and suggestions are never recorded.</string>
+    <string name="config_save_failed">Could not save settings. Check that Vector is connected.</string>
 </resources>

@@ -24,4 +24,5 @@
 <string name="reset">重置崩溃保护</string>
 <string name="reset_done">下次重新加载 Simeji 时将重置保护</string>
 <string name="privacy">不申请网络权限，不记录输入内容或转换候选。</string>
+    <string name="config_save_failed">无法保存设置。请检查 Vector 连接。</string>
 </resources>

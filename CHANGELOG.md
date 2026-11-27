@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- Use Vector preferences so the hook can start even when Simeji Clean is stopped.
+
 ## 0.1.0
 
 - Hide Simeji's advertising popup only while entering text in Google Play.
